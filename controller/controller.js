@@ -1,4 +1,5 @@
 const {Kafka, Partitioners} = require('kafkajs')
+const name = "mani"
 
 const kafka = new Kafka({
     clientId:'Manikanta03',
