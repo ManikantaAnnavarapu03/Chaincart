@@ -1,10 +1,12 @@
 const {Kafka, Partitioners} = require('kafkajs')
+const jwt = require('jsonwebtoken')
 const name = "mani"
 
 const kafka = new Kafka({
     clientId:'Manikanta03',
     brokers:['localhost:9092']
 })
+const secret = "manikanta@03"
 
 async function handleLogin(req, res){
     try{
@@ -20,7 +22,7 @@ async function handleLogin(req, res){
         })
         await producer.disconnect()
         console.log("producer disconnected")
-        const consumer = kafka.consumer({groupId:'user-ress-group', autoCommit:true})
+        const consumer = kafka.consumer({groupId:'user-ress-group'})
         await consumer.connect()
         console.log("consumer connected")
         await consumer.subscribe({topic:'user-ress-topic'})
@@ -29,7 +31,11 @@ async function handleLogin(req, res){
                 const userMessage = JSON.parse(message.value.toString())
                 if (!res.headersSent){
                     if(userMessage == "user valid"){
-                        res.status(200).json({message:userMessage})
+                        const payload = {user_name:body.username, role:"developer"}
+                        options ={expriresIn:'1h'}
+                        const token = await jwt.sign(payload, secret, options)
+
+                        res.status(200).json({Access_Token:token})
                         consumer.disconnect()
                     }
                     else if(userMessage == "user not found"){
@@ -65,7 +71,7 @@ async function handleSignup(req, res){
         })
         await producer.disconnect()
         console.log("producer disconnected")
-        const consumer = kafka.consumer({groupId:'user-ress-group', autoCommit:true})
+        const consumer = kafka.consumer({groupId:'user-ress-group'})
         await consumer.connect()
         console.log("consumer connected")
         await consumer.subscribe({topic:'user-ress-topic'})
@@ -96,13 +102,32 @@ async function handleSignup(req, res){
 
 async function handlePostOrderDetails(req, res){
     try{
-    const data = req.data
+    const data = req.body
    const producer = kafka.producer({createPartitioner:Partitioners.LegacyPartitioner})
    await producer.connect()
    console.log("producer connected")
    await producer.send({
     topic:'order-req-topic',
-    messages:[{key:"post", value:{action:'post', data:JSON.stringify(data)}}]
+    messages:[{key:"post", value:JSON.stringify({action:'post', data:data})}]
+   })
+   await producer.disconnect()
+   const consumer = kafka.consumer({groupId:'order-res-group'})
+   await consumer.connect()
+   await consumer.subscribe({topic:'order-res-topic'})
+   await consumer.run({
+    eachMessage: async ({topic, partition, message}) =>{
+        const userMessage = JSON.parse(message.value.toString())
+        console.log(userMessage)
+        if(!res.headersSent){
+            if(userMessage == "order created"){
+                res.status(201).json({message:userMessage})
+                consumer.disconnect()
+            }
+            else{
+                res.status(400).json({message:'order not created'})
+            }
+        }
+    }
    })
 }catch(error){
     console.log(error)
@@ -111,6 +136,32 @@ async function handlePostOrderDetails(req, res){
 
 
 async function handleGetOrderDetails(req, res){
+    try{
+        const data = req.body
+       const producer = kafka.producer({createPartitioner:Partitioners.LegacyPartitioner})
+       await producer.connect()
+       console.log("producer connected")
+       await producer.send({
+        topic:'order-req-topic',
+        messages:[{key:"post", value:JSON.stringify({action:'get', data:"get user details"})}]
+       })
+       await producer.disconnect()
+       const consumer = kafka.consumer({groupId:'order-res-group'})
+       await consumer.connect()
+       await consumer.subscribe({topic:'order-res-topic'})
+       await consumer.run({
+        eachMessage: async ({topic, partition, message}) =>{
+            const userMessage = JSON.parse(message.value.toString())
+            console.log(userMessage)
+            if(!res.headersSent){
+                res.status(200).json({data:userMessage})
+                consumer.disconnect()
+            }
+        }
+       })
+    }catch(error){
+        console.log(error)
+    }
 
 }
 
