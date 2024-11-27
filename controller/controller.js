@@ -20,16 +20,23 @@ async function handleLogin(req, res){
         })
         await producer.disconnect()
         console.log("producer disconnected")
-        const consumer = kafka.consumer({groupId:'user-ress-group'})
+        const consumer = kafka.consumer({groupId:'user-ress-group', autoCommit:true})
         await consumer.connect()
         console.log("consumer connected")
-        await consumer.subscribe({topic:'user-ress-topic', fromBeginning:true})
+        await consumer.subscribe({topic:'user-ress-topic'})
         await consumer.run({
             eachMessage: async({topic, partition, message}) =>{
                 const userMessage = JSON.parse(message.value.toString())
                 if (!res.headersSent){
-                    res.status(200).json({message:userMessage[0]})
-                    consumer.disconnect()
+                    if(userMessage == "user valid"){
+                        res.status(200).json({message:userMessage})
+                        consumer.disconnect()
+                    }
+                    else if(userMessage == "user not found"){
+                        res.status(404).json({message:userMessage})
+                        consumer.disconnect()
+                    }
+                    
                 }
             }
         })
